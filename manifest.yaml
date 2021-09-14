@@ -1,0 +1,84 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grumpy
+  namespace: default
+  labels:
+    name: grumpy
+spec:
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: 8080
+  selector:
+    name: grumpy 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grumpy
+  namespace: default
+  labels:
+    name: grumpy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: grumpy
+  template:
+    metadata:
+      name: grumpy 
+      labels:
+        name: grumpy
+    spec:
+      containers:
+        - name: webhook
+#         image: pipo02mix/grumpy:1.0.0
+          image: sm171190/validatingwebhook:0.1 
+          imagePullPolicy: Always
+          args:
+            - -alsologtostderr
+            - --log_dir=/
+            - -v=10
+            - 2>&1
+          resources:
+            limits:
+              memory: 50Mi
+              cpu: 300m
+            requests:
+              memory: 00Mi
+              cpu: 300m
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /etc/certs
+              readOnly: true
+            - name: logs
+              mountPath: /tmp
+          securityContext:
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: grumpy
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: grumpy
+webhooks:
+  - name: grumpy.pipo02mix.org
+    clientConfig:
+      service:
+        name: grumpy
+        namespace: default
+        path: "/validate"
+      caBundle: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUVGekNDQXY4Q0ZBbzVZanRqRVlVSFU2V1ovNnBxbUwrL0NKSUdNQTBHQ1NxR1NJYjNEUUVCRFFVQU1JSEgKTVFzd0NRWURWUVFHRXdKRVJURVFNQTRHQTFVRUNBd0hRMjlzYjJkdVpURVFNQTRHQTFVRUJ3d0hRMjlzYjJkdQpaVEVQTUEwR0ExVUVFUXdHTkRJME1qUXlNUlF3RWdZRFZRUUpEQXRJWVd4c2J5QWdNVFl5TVRFVE1CRUdBMVVFCkNnd0taMmxoYm5SemQyRnliVEVaTUJjR0ExVUVDd3dRUlcxdmFua2dSR1Z3WVhKMGJXVnVkREVXTUJRR0ExVUUKQXd3TloybGhiblJ6ZDJGeWJTNXBiekVsTUNNR0NTcUdTSWIzRFFFSkFSWVdibTh0Y21Wd2JIbEFaMmxoYm5SegpkMkZ5YlM1cGJ6QWVGdzB5TVRBNU1URXdOakkzTWpKYUZ3MHlNVEV3TVRFd05qSTNNakphTUlISE1Rc3dDUVlEClZRUUdFd0pFUlRFUU1BNEdBMVVFQ0F3SFEyOXNiMmR1WlRFUU1BNEdBMVVFQnd3SFEyOXNiMmR1WlRFUE1BMEcKQTFVRUVRd0dOREkwTWpReU1SUXdFZ1lEVlFRSkRBdElZV3hzYnlBZ01UWXlNVEVUTUJFR0ExVUVDZ3dLWjJsaApiblJ6ZDJGeWJURVpNQmNHQTFVRUN3d1FSVzF2YW5rZ1JHVndZWEowYldWdWRERVdNQlFHQTFVRUF3d05aMmxoCmJuUnpkMkZ5YlM1cGJ6RWxNQ01HQ1NxR1NJYjNEUUVKQVJZV2JtOHRjbVZ3YkhsQVoybGhiblJ6ZDJGeWJTNXAKYnpDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTHcrdDdGTGZtUzVIcEtmbzFnbwp6SHpPbUwzWDR1eXVodjNNMWZkcUNBQlBjcU12KzZLKzNzWGRwb0NXMzQ5bFh1NVRmZmV6cFpIVTN3MDlHeVdyCm9aaEFVS2RjaWlFZkFsR1U2QUM0eEhveVd6WlhVckVVRjZscG0xKzV3MldzVjZPcEdoRTljV3dyU0JJQ1pqSWsKOFRraHQ0K2pXYXY2WXR5UWppdE8ycmV4dWhmRE1xVWhsT2NuYkUzS29zWXJiZWNTMS9meDBUVTkwTWR6ZFR4NQpEZElyaUVXMlBJc0JDNkpwM1p0NzB4SEVvV091RVJnWFVNSWw4dmdhVER5eCt3YjJQeDdrNGovMWMzd0hNWHhKClQyK3U2WGlaNTV6cytKekxvVFRORU9jcFo4VXFxbmJuMUhnQ1FieG9oeGNYQ0JWS3d5ZnRvdjBKSXhKdzdYQW8KZkFFQ0F3RUFBVEFOQmdrcWhraUc5dzBCQVEwRkFBT0NBUUVBU3N5Ym1hTG1TemtZTHE4VnlRM0xEVGJBLzBPNQoxdklzVEoyY2gza2ZPbGRNMHJ1MXlEWmM5Q0dVY29XWmdSZkhJNlF1UVd0L3JaK2JlQytvUlVOQTB5Z3RkNmRWCkFPanEyNGJvMC9HSnNxVUQzblBNTzRRdzh4alBtc0FIUDBZcEhjbEpieGQzdkxzOXJKNXA1anorc0FVU0pWOE4KNTEzZUZuZnJOWm1GRjhoT0FUWFZPaTcrUDFucklBVlhKSWxsN2pZS3JLcWUwY3pYZC8zV0s4ek90VUV6UXdKLwpCbnFJVklWeENPMnVETGZOWFRYaHdtSVZHNmNZdFFLNnBKREQrTkgyS09xMnJvb3lObzRqcEpTKzVBYWI4dXNpCmRrWkg4a244YzcvQ01UTjBwM0xzRzdZdWlONXVobzNuUFp1dHFNS3Y3Q0tIL2dVYThueHNtdzQ5akE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+    rules:
+      - operations: ["CREATE","UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    failurePolicy: Ignore
